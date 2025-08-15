@@ -2,8 +2,7 @@ import numpy as np
 from scipy.sparse import lil_matrix
 from sklearn.base import TransformerMixin, BaseEstimator
 from rdkit.Chem import Descriptors, RDKFingerprint
-from rdkit.Chem import rdFingerprintGenerator
-
+from rdkit.Chem.AllChem import GetHashedMorganFingerprint, GetMorganFingerprintAsBitVect
 __all__ = ['RDKitDescriptor', 'HashedMorgan', 'BinaryHashedMorgan', 'RDKitFingerprint']
 
 
@@ -19,7 +18,7 @@ class RDKitDescriptor(TransformerMixin, BaseEstimator):
         """SMILESの配列`data`をRDKit記述子にする"""
         return np.matrix(list(map(lambda m:
                                   list(map(
-                                      lambda f: f(m), dict(Descriptors.descList).values()
+                                      lambda f:f(m), dict(Descriptors.descList).values()
                                   ))
                                  , data)))
 
@@ -37,11 +36,12 @@ class HashedMorgan(TransformerMixin, BaseEstimator):
         """SMILESの配列`data`をHashed Morganフィンガープリントにする"""
         n_samples = len(data)
         D = lil_matrix((n_samples, self.n_bits))
-        morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=int(self.radius), fpSize=int(self.n_bits))
         for ix, mol in enumerate(data):
-            morgan = morgan_gen.GetCountFingerprint(mol).GetNonzeroElements()
+            morgan = GetHashedMorganFingerprint(mol=mol,
+                                             radius=int(self.radius),
+                                             nBits=int(self.n_bits)).GetNonzeroElements()
             for key, val in morgan.items():
-                D[ix, key] = val
+                D[ix, key]=val
         return D.toarray()
 
 
@@ -58,9 +58,10 @@ class BinaryHashedMorgan(TransformerMixin, BaseEstimator):
         """SMILESの配列`data`をHashed Morganフィンガープリントにする"""
         n_samples = len(data)
         D = lil_matrix((n_samples, self.n_bits))
-        morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=int(self.radius), fpSize=int(self.n_bits))
         for ix, mol in enumerate(data):
-            D[ix, :] = morgan_gen.GetFingerprint(mol)
+            D[ix, :] = GetMorganFingerprintAsBitVect(mol=mol,
+                                             radius=int(self.radius),
+                                             nBits=int(self.n_bits))
         return D.toarray()
 
 
@@ -79,6 +80,7 @@ class RDKitFingerprint(TransformerMixin, BaseEstimator):
         n_samples = len(data)
         D = lil_matrix((n_samples, self.n_bits))
         for ix, mol in enumerate(data):
-            D[ix, :] = RDKFingerprint(mol=mol, fpSize=int(self.n_bits),
+            D[ix, :] = RDKFingerprint(mol=mol, # radius=int(self.radius),
+                                      fpSize=int(self.n_bits),
                                       minPath=1, maxPath=int(self.fraglen))
         return D.toarray()
